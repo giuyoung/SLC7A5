@@ -94,10 +94,9 @@ DEG = sc.get.rank_genes_groups_df(pan, group = None, pval_cutoff = 0.05, log2fc_
 
 DEG.to_csv('DEG.csv')
 
-pan.obs['cluster01'] = pan.obs['leiden']
-pan.obs
+pan.obs['cluster02'] = pan.obs['leiden']
 
-cluster01_names = {'0':'Tumor cells', '1':'Immune cells', '2':'Immune cells',
+cluster02_names = {'0':'Tumor cells', '1':'Immune cells', '2':'Immune cells',
                    '3':'Immune cells', '4':'Immune cells', '5':'Fibroblasts',
                    '6':'Immune cells', '7':'Immune cells', '8':'Tumor cells',
                    '9':'Immune cells', '10':'Fibroblasts', '11':'Immune cells',
@@ -111,12 +110,12 @@ cluster01_names = {'0':'Tumor cells', '1':'Immune cells', '2':'Immune cells',
                    '33':'Immune cells', '34':'Immune cells', '35':'Immune cells',
                    '36':'Immune cells', '37':'Immune cells'}
 
-pan.obs = pan.obs.replace({'cluster01': cluster01_names})
+pan.obs = pan.obs.replace({'cluster02': cluster02_names})
 pan.obs
 
-sc.pl.umap(pan, color='cluster01',legend_loc='on data')
+sc.pl.umap(pan, color='cluster02',legend_loc='on data')
 
-cross1 = pd.crosstab(pan.obs['cancer_type'],pan.obs['cluster01'])
+cross1 = pd.crosstab(pan.obs['cancer_type'],pan.obs['cluster02'])
 
 import matplotlib.pyplot as plt
 
@@ -137,3 +136,8 @@ plt.bar(cancer_type, cell_number)
 plt.grid()
 plt.savefig('figure/cell.pdf')
 plt.show()
+
+marker_genes = ['EPCAM', 'KRT5','PECAM1', 'VWF','COL3A1', 'ACTA2','COL1A1','PTPRC']
+
+sc.pl.dotplot(pan, marker_genes, groupby='cluster01',show = False)
+plt.savefig("figure/dotplot_cluster01.pdf",bbox_inches = 'tight')
