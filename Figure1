@@ -20,3 +20,120 @@ mpl.rcParams["font.sans-serif"] = "Arial"
 %config InlineBackend.figure_format = 'retina'
 
 sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(4, 4))
+
+GHRB20120531_HNSC = sc.read_h5ad('dataset/GHRB20120531_HNSC.h5ad')
+
+GSE103322_HNSC = sc.read_h5ad('dataset/GSE103322_HNSC_tumor.h5ad')
+
+GSE127465_LUSC = sc.read_h5ad('dataset/GSE127465_LUSC.h5ad')
+
+GSE144236_CSCC = sc.read_h5ad('dataset/GSE144236_CSCC.h5ad')
+
+GSE150321_LSCC = sc.read_h5ad('dataset/GSE150321_LSCC.h5ad')
+
+GSE160269_ESCC = sc.read_h5ad('dataset/GSE160269_ESCC.h5ad')
+
+GSE164690_HNSC = sc.read_h5ad('dataset/GSE164690_HNSC.h5ad')
+
+GSE168652_CESC = sc.read_h5ad('dataset/GSE168652_CESC.h5ad')
+
+huaxi_LUSC = sc.read_h5ad('dataset/huaxi_LUSC.h5ad')
+
+pan = {"GHRB20120531_HNSC":GHRB20120531_HNSC, "GSE103322_HNSC":GSE103322_HNSC, "GSE127465_LUSC":GSE127465_LUSC,
+       "GSE144236_CSCC":GSE144236_CSCC, "GSE150321_LSCC":GSE150321_LSCC, "GSE160269_ESCC":GSE160269_ESCC,
+       "GSE164690_HNSC":GSE164690_HNSC, "GSE168652_CESC":GSE168652_CESC, "huaxi_LUSC":huaxi_LUSC}
+
+pan = sc.concat((pan),join="outer",label="study")
+
+pan.obs_names_make_unique()
+pan.obs_names_make_unique()
+
+pan.obs['cancer_type'] = pan.obs['study'].str.split('_', n=1).str[1]
+
+pan.write_h5ad('data/pan_original.h5ad')
+
+import bbknn
+
+sc.pp.normalize_total(pan, target_sum=1e4)
+
+sc.pp.log1p(pan)
+
+sc.pp.highly_variable_genes(pan, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+
+pan.raw = pan
+
+pan = pan[:, pan.var.highly_variable]
+
+sc.pp.regress_out(pan, ['total_counts', 'pct_counts_mt'])
+
+sc.pp.scale(pan, max_value=10)
+
+sc.tl.pca(pan, svd_solver='arpack')
+sc.pl.pca_variance_ratio(pan, log=True)
+
+sc.external.pp.bbknn(pan, batch_key= "sample",n_pcs=10,neighbors_within_batch = 1)
+
+sc.tl.umap(pan)
+
+sc.tl.leiden(pan,resolution = 2)
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(pan, color='leiden',legend_loc='on data')
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(pan, color='cancer_type',show=False)
+plt.savefig("figure/umap_cancer_type.pdf",bbox_inches = 'tight')
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(pan, color=['EPCAM', 'KRT5','PECAM1', 'VWF','COL3A1', 'ACTA2','COL1A1','PTPRC'],show=False)
+plt.savefig("figure/umap_feature_1.pdf",bbox_inches = 'tight')
+
+sc.tl.rank_genes_groups(pan, 'leiden', method='wilcoxon')
+
+DEG = sc.get.rank_genes_groups_df(pan, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+
+DEG.to_csv('DEG.csv')
+
+pan.obs['cluster01'] = pan.obs['leiden']
+pan.obs
+
+cluster01_names = {'0':'Tumor cells', '1':'Immune cells', '2':'Immune cells',
+                   '3':'Immune cells', '4':'Immune cells', '5':'Fibroblasts',
+                   '6':'Immune cells', '7':'Immune cells', '8':'Tumor cells',
+                   '9':'Immune cells', '10':'Fibroblasts', '11':'Immune cells',
+                   '12':'Tumor cells', '13':'Immune cells', '14':'Immune cells',
+                   '15':'Tumor cells', '16':'Immune cells', '17':'Tumor cells',
+                   '18':'Immune cells', '19':'Immune cells', '20':'Immune cells',
+                   '21':'Tumor cells', '22':'Immune cells', '23':'Immune cells',
+                   '24':'Immune cells', '25':'Endothelial cells', '26':'Endothelial cells',
+                   '27':'Immune cells', '28':'Immune cells', '29':'Immune cells',
+                   '30':'Fibroblasts', '31':'Tumor cells', '32':'Fibroblasts',
+                   '33':'Immune cells', '34':'Immune cells', '35':'Immune cells',
+                   '36':'Immune cells', '37':'Immune cells'}
+
+pan.obs = pan.obs.replace({'cluster01': cluster01_names})
+pan.obs
+
+sc.pl.umap(pan, color='cluster01',legend_loc='on data')
+
+cross1 = pd.crosstab(pan.obs['cancer_type'],pan.obs['cluster01'])
+
+import matplotlib.pyplot as plt
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(8, 8))
+cancer_type = ('HNSC', 'CSCC', 'CESC', 'ESCC', 'LSCC','LUSC')
+patient_number = [44, 10, 1, 60, 2, 15]
+plt.ylabel('Number of patients',fontsize=20)
+plt.bar(cancer_type, patient_number)
+plt.grid()
+plt.savefig('figure/patient.pdf')
+plt.show()
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(8, 8))
+cancer_type = ('HNSC', 'CSCC', 'CESC', 'ESCC', 'LSCC','LUSC')
+cell_number = [159886, 24687, 5708, 174194, 3642, 75993]
+plt.ylabel('Number of cells',fontsize=20)
+plt.bar(cancer_type, cell_number)
+plt.grid()
+plt.savefig('figure/cell.pdf')
+plt.show()
