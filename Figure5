@@ -1,1 +1,30 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import scipy as sp
+import numpy as np
+import warnings
+
+# NB these new packages
+import scvelo as scv
+import cellrank as cr
+
+sc.settings.set_figure_params(dpi=80)
+warnings.filterwarnings('ignore')
+
+%config InlineBackend.figure_format = 'retina'
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(4, 4))
+
+import os
+os.chdir("/home/zhanglz3/Finalshell1.0")
+os.getcwd()
+
+pan = sc.read("data/pan.h5ad")
+
+Immunecells = pan[pan.obs['cluster02'].isin(['Immnue cells'])]
+Immunecells
+
+Immunecells.write_h5ad("data/Immunecells.h5ad")
 
