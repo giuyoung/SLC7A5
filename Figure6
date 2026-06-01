@@ -1,1 +1,177 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scanpy as sc
+import scipy as sp
+import numpy as np
+import warnings
 
+# NB these new packages
+import scvelo as scv
+import cellrank as cr
+
+sc.settings.set_figure_params(dpi=80)
+warnings.filterwarnings('ignore')
+
+%config InlineBackend.figure_format = 'retina'
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(4, 4))
+
+import os
+os.chdir("/home/zhanglz3/Finalshell1.0")
+os.getcwd()
+
+Immunecells = sc.read_h5ad("data/Immunecells.h5ad")
+Immunecells = Immunecells.raw.to_adata()
+Immunecells
+
+CD8_Immunecells = Immunecells[Immunecells.obs['cluster05'].isin(['CD8 T cells'])]
+CD8_Immunecells
+CD8_Immunecells.write_h5ad("data/CD8_Immunecells.h5ad")
+
+import bbknn
+sc.pp.normalize_total(CD8_Immunecells, target_sum=1e4)
+sc.pp.log1p(CD8_Immunecells)
+sc.pp.highly_variable_genes(CD8_Immunecells, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+CD8_Immunecells.raw = CD8_Immunecells
+CD8_Immunecells = CD8_Immunecells[:, CD8_Immunecells.var.highly_variable]
+sc.pp.regress_out(CD8_Immunecells, ['total_counts', 'pct_counts_mt'])
+sc.pp.scale(CD8_Immunecells, max_value=10)
+sc.tl.pca(CD8_Immunecells, svd_solver='arpack')
+sc.pl.pca_variance_ratio(CD8_Immunecells, log=True)
+sc.external.pp.bbknn(CD8_Immunecells, batch_key= "sample",n_pcs=50,neighbors_within_batch = 1)
+sc.tl.umap(CD8_Immunecells)
+sc.tl.leiden(CD8_Immunecells,resolution = 1)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(CD8_Immunecells, color='leiden',legend_loc='on data',show=False)
+plt.savefig("figure/umap_leiden_CD8_Immunecells.pdf")
+
+CD8_Immunecells.uns['log1p']["base"] = None
+sc.tl.rank_genes_groups(CD8_Immunecells, 'leiden', method='wilcoxon')
+CD8_Immunecells.write_h5ad("data/CD8_Immunecells.h5ad")
+DEG = sc.get.rank_genes_groups_df(CD8_Immunecells, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+DEG.to_csv('DEG_CD8_Immunecells.csv')
+
+CD8_Immunecells.obs['cluster06'] = CD8_Immunecells.obs['leiden']
+cluster06_names = {'0':'Effector CD8 T cells', '1':'Exhausted CD8 T cells', '2':'Effector CD8 T cells',
+                   '3':'Effector CD8 T cells', '4':'Exhausted CD8 T cells','5':'Effector CD8 T cells',
+                   '6':'Naïve CD8 T cells','7':'Exhausted CD8 T cells',}
+CD8_Immunecells.obs = CD8_Immunecells.obs.replace({'cluster06': cluster06_names})
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(CD8_Immunecells, color='cluster06',legend_loc='on data')
+plt.savefig("figure/umap_leiden_CD8_Immunecells_annotation.pdf")
+
+marker_genes = ['CCR7','SELL', 'GZMK','PDCD1','CTLA4','HAVCR2']
+sc.pl.dotplot(CD8_Immunecells, marker_genes, groupby='cluster06',show = False)
+plt.savefig("figure/dotplot_CD8_Immunecells_cluster06.pdf",bbox_inches = 'tight')
+
+cross = pd.read_table("CSC_CD8_cross.csv",sep = ',')
+cross = cross.rename(columns={'Unnamed: 0':'group'})
+
+x = cross['group']
+summ = cross['Effector CD8 T cells']+cross['Exhausted CD8 T cells']+cross['Naive CD8 T cells']
+y1 = cross['Naive CD8 T cells']/summ
+y2 = cross['Effector CD8 T cells']/summ
+y3 = cross['Exhausted CD8 T cells']/summ
+
+plt.bar(x,y1,width=0.4,label='Naive CD8 T cells',edgecolor='grey',zorder=5)
+plt.bar(x,y2,width=0.4,bottom = y1, label='Effector CD8 T cells',edgecolor='grey',zorder=5)
+plt.bar(x,y3,width=0.4,bottom = y1+y2,label='Exhausted CD8 T cells',edgecolor='grey',zorder=5)
+plt.tick_params(axis='x',length=0)
+plt.xlabel('Group',fontsize=20)
+plt.ylabel('Proportion',fontsize=20)
+plt.ylim(0,1.01)
+plt.yticks(np.arange(0,1.2,0.2),[f'{i}%' for i in range(0,120,20)])
+plt.grid(axis='y',alpha=0.5,ls='--')
+# 添加图例，将图例移至图外
+plt.legend(frameon=False,bbox_to_anchor=(1.01,1))
+plt.savefig("figure/stacked_bar_CD8.pdf",bbox_inches = 'tight')
+plt.show()
+
+Immunecells = sc.read_h5ad("data/Immunecells.h5ad")
+Immunecells = Immunecells.raw.to_adata()
+
+CD4_Immunecells = Immunecells[Immunecells.obs['cluster05'].isin(['CD4 T cells'])]
+CD4_Immunecells
+CD4_Immunecells.write_h5ad("data/CD4_Immunecells.h5ad")
+
+import bbknn
+sc.pp.normalize_total(CD4_Immunecells, target_sum=1e4)
+sc.pp.log1p(CD4_Immunecells)
+sc.pp.highly_variable_genes(CD4_Immunecells, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+CD4_Immunecells.raw = CD4_Immunecells
+CD4_Immunecells = CD4_Immunecells[:, CD4_Immunecells.var.highly_variable]
+sc.pp.regress_out(CD4_Immunecells, ['total_counts', 'pct_counts_mt'])
+sc.pp.scale(CD4_Immunecells, max_value=10)
+sc.tl.pca(CD4_Immunecells, svd_solver='arpack')
+sc.pl.pca_variance_ratio(CD4_Immunecells, log=True)
+sc.external.pp.bbknn(CD4_Immunecells, batch_key= "sample",n_pcs=50,neighbors_within_batch = 1)
+sc.tl.umap(CD4_Immunecells)
+sc.tl.leiden(CD4_Immunecells,resolution = 1.5)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(CD4_Immunecells, color='leiden',legend_loc='on data')
+sc.tl.rank_genes_groups(CD4_Immunecells, 'leiden', method='wilcoxon')
+CD4_Immunecells.write_h5ad("data/CD4_Immunecells.h5ad")
+sc.tl.rank_genes_groups(CD4_Immunecells, 'leiden', method='wilcoxon')
+DEG = sc.get.rank_genes_groups_df(CD4_Immunecells, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+DEG.to_csv('DEG_CD4_Immunecells.csv')
+
+CD4_Immunecells.obs['cluster_CD4'] = CD4_Immunecells.obs['leiden']
+cluster_CD4_names = {'0':'Naïve CD4 T cells',
+                     '1':'Memory CD4 T cells',
+                     '2':'Memory CD4 T cells',
+                     '3':'Tregs', 
+                     '4':'Naïve CD4 T cells', 
+                     '5':'Memory CD4 T cells',
+                     '6':'Tregs',
+                     '7':'Doublets',
+                     '8':'Naïve CD4 T cells',
+                     '9':'Tfh', 
+                     '10':'Tregs', 
+                     '11':'Memory CD4 T cells',
+                     '12':'Doublets',
+                     '13':'Doublets',
+                     '14':'Memory CD4 T cells',
+                     '15':'Doublets'}
+CD4_Immunecells.obs = CD4_Immunecells.obs.replace({'cluster_CD4': cluster_CD4_names})
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(CD4_Immunecells, color='cluster_CD4',legend_loc='on data')
+CD4_Immunecells_filtered = CD4_Immunecells[~CD4_Immunecells.obs['cluster_CD4'].isin(['Doublets'])]
+CD4_Immunecells_filtered
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(CD4_Immunecells_filtered, color='cluster_CD4',legend_loc='on data')
+
+marker_genes = ['CCR7','LEF1', 'TCF7',
+                'IL7R','GPR183','CD69',
+                'FOXP3','IL2RA',
+                'CXCL13','TOX']
+sc.pl.dotplot(CD4_Immunecells_filtered, marker_genes, groupby='cluster_CD4',show = False)
+plt.savefig("figure/dotplot_CD8_Immunecells_cluster06.pdf",bbox_inches = 'tight')
+
+cross = pd.crosstab(CD4_Immunecells_filtered.obs['CSCgroup'],CD4_Immunecells_filtered.obs['cluster06'])
+# 使用索引而非列访问分组信息
+x = cross.index  # 获取索引（即 CSCgroup 的分组信息）
+
+# 计算总和
+summ = cross['Naïve CD4 T cells'] + cross['Memory CD4 T cells'] + cross['Tregs'] + cross['Tfh']
+
+# 计算比例
+y1 = cross['Naïve CD4 T cells'] / summ
+y2 = cross['Memory CD4 T cells'] / summ
+y3 = cross['Tregs'] / summ
+y4 = cross['Tfh'] / summ
+
+plt.bar(x,y1,width=0.4,label='Naïve CD4 T cells',edgecolor='grey',zorder=5)
+plt.bar(x,y2,width=0.4,bottom = y1, label='Memory CD4 T cells',edgecolor='grey',zorder=5)
+plt.bar(x,y3,width=0.4,bottom = y1+y2,label='Tregs',edgecolor='grey',zorder=5)
+plt.bar(x,y4,width=0.4,bottom = y1+y2+y3,label='Tfh',edgecolor='grey',zorder=5)
+plt.tick_params(axis='x',length=0)
+plt.xlabel('Group',fontsize=20)
+plt.ylabel('Proportion',fontsize=20)
+plt.ylim(0,1.01)
+plt.yticks(np.arange(0,1.2,0.2),[f'{i}%' for i in range(0,120,20)])
+plt.grid(axis='y',alpha=0.5,ls='--')
+# 添加图例，将图例移至图外
+plt.legend(frameon=False,bbox_to_anchor=(1.01,1))
+#plt.savefig("figure/stacked_bar_CD8.pdf",bbox_inches = 'tight')
+plt.show()
