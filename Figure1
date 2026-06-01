@@ -141,3 +141,118 @@ marker_genes = ['EPCAM', 'KRT5','PECAM1', 'VWF','COL3A1', 'ACTA2','COL1A1','PTPR
 
 sc.pl.dotplot(pan, marker_genes, groupby='cluster01',show = False)
 plt.savefig("figure/dotplot_cluster01.pdf",bbox_inches = 'tight')
+
+pan_tumor = pan[pan.obs['cluster02'].isin(['Tumor cells'])]
+pan_tumor
+
+pan_tumor.obs['leiden'].unique()
+
+pan_tumor.obs['cluster03'] = pan_tumor.obs['leiden']
+
+cluster03_names = {'0':'Tumor cells 1', '8':'Tumor cells 2', '12':'Tumor cells 3',
+                   '15':'Tumor cells 4', '17':'Tumor cells 5', '21':'Tumor cells 6',
+                   '31':'Tumor cells 7'}
+
+pan_tumor.obs = pan_tumor.obs.replace({'cluster03': cluster03_names})
+
+sc.pp.normalize_per_cell(pan_tumor, counts_per_cell_after=1e4)
+sc.pp.log1p(pan_tumor)
+sc.pp.highly_variable_genes(pan_tumor, min_mean=0.0125, max_mean=5, min_disp=0.25)
+
+# This is a necessary hack. See CellRank docs
+pan_tumor.layers["spliced"] = pan_tumor.X
+pan_tumor.layers["unspliced"] = pan_tumor.X
+scv.pp.moments(pan_tumor, n_pcs=30, n_neighbors=30)
+
+from cellrank.kernels import CytoTRACEKernel
+ctk = CytoTRACEKernel(pan_tumor).compute_cytotrace()
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+sc.pl.umap(pan_tumor, color=['cluster03',"ct_score"],legend_loc='on data',color_map="gnuplot2",show = False)
+plt.savefig("figure/umap_cytotrace.pdf")
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+sc.pl.violin(pan_tumor, keys=["ct_score","ct_pseudotime"], groupby="cluster03", rotation=90,color_map="gnuplot2",show = False)
+plt.savefig("figure/violin_cytotrace.pdf")
+
+ctk.compute_transition_matrix(threshold_scheme="soft", nu=0.5)
+
+ctk.plot_projection(basis="umap")
+
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+scv.pl.velocity_embedding_stream(
+    pan_tumor, color="cluster03", vkey="T_fwd", basis="umap", legend_loc="on data",show = False)
+plt.savefig("figure/velocity.pdf")
+
+scv.pl.velocity_embedding_stream(
+    pan_tumor, color="cluster03", vkey="T_fwd", basis="umap", legend_loc="on data")
+
+pan_tumor.obs['cluster04'] = pan_tumor.obs['leiden']
+
+cluster04_names = {'0':'Tumor cells', '8':'Tumor cells', '12':'Tumor cells',
+                   '15':'Tumor cells', '17':'Tumor cells', '21':'Tumor stem cells',
+                   '31':'Tumor cells'}
+
+pan_tumor.obs = pan_tumor.obs.replace({'cluster04': cluster04_names})
+
+cross = pd.crosstab(pan_tumor.obs['sample'],pan_tumor.obs['cluster04'])
+
+cross = cross.loc['OOC1':'OOC8',]
+
+x = cross2['group']
+y1 = cross2['Tumor cells']/(cross2['Tumor cells']+cross2['Tumor stem cells'])
+y2 = cross2['Tumor stem cells']/(cross2['Tumor cells']+cross2['Tumor stem cells'])
+
+plt.bar(x,y1,width=0.4,label='Tumor cells',color='#00bfc4',edgecolor='grey',zorder=5)
+plt.bar(x,y2,width=0.4,bottom=y1,label='Tumor stem cells',color='#f9766e',edgecolor='grey',zorder=5)
+plt.tick_params(axis='x',length=0)
+plt.xlabel('Group',fontsize=20)
+plt.ylabel('Proportion',fontsize=20)
+plt.ylim(0,1.01)
+plt.yticks(np.arange(0,1.2,0.2),[f'{i}%' for i in range(0,120,20)])
+plt.grid(axis='y',alpha=0.5,ls='--')
+# 添加图例，将图例移至图外
+plt.legend(frameon=False,bbox_to_anchor=(1.01,1))
+plt.savefig("figure/stacked_bar_2.pdf",bbox_inches = 'tight')
+plt.show()
+
+import gseapy as gp
+# simple plotting function
+from gseapy.plot import barplot, dotplot
+
+names = gp.get_library_name()  # default: Human
+
+pan_tumor.layers['counts'] = pan_tumor.X # Save raw counts
+
+# preprocessing
+sc.pp.normalize_total(pan_tumor, target_sum=1e4)
+sc.pp.log1p(pan_tumor)
+pan_tumor.layers['lognorm'] = pan_tumor.X
+
+# set STIM as class 0, CTRL as class 1, to make categorical
+pan_tumor.obs['cluster04'] = pd.Categorical(pan_tumor.obs['cluster04'], categories=["Tumor stem cells", "Tumor cells"], ordered=True)
+
+indices = pan_tumor.obs.sort_values(['cluster04']).index
+pan_tumor = pan_tumor[indices,:]
+
+res_KEGG = gp.gsea(data=pan_tumor.to_df().T, # row -> genes, column-> samples
+        gene_sets="KEGG_2021_Human",
+        cls=pan_tumor.obs.cluster04,
+        permutation_num=1000,
+        permutation_type='phenotype',
+        outdir=None,
+        method='s2n', # signal_to_noise
+        threads= 16)
+
+res_KEGG.res2d.to_csv('gsea_tumor_KEGG_new.csv')
+
+res_GO = gp.gsea(data=pan_tumor.to_df().T, # row -> genes, column-> samples
+        gene_sets="GO_Biological_Process_2023",
+        cls=pan_tumor.obs.cluster04,
+        permutation_num=1000,
+        permutation_type='phenotype',
+        outdir=None,
+        method='s2n', # signal_to_noise
+        threads= 16)
+
+res_GO.res2d.to_csv('gsea_tumor_GO.csv')
