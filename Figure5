@@ -28,3 +28,323 @@ Immunecells
 
 Immunecells.write_h5ad("data/Immunecells.h5ad")
 
+import bbknn
+
+sc.pp.normalize_total(Immunecells, target_sum=1e4)
+
+sc.pp.log1p(Immunecells)
+
+sc.pp.highly_variable_genes(Immunecells, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+
+Immunecells.raw = Immunecells
+
+Immunecells = Immunecells[:, Immunecells.var.highly_variable]
+sc.pp.regress_out(Immunecells, ['total_counts', 'pct_counts_mt'])
+sc.pp.scale(Immunecells, max_value=10)
+sc.tl.pca(Immunecells, svd_solver='arpack')
+sc.pl.pca_variance_ratio(Immunecells, log=True)
+sc.external.pp.bbknn(Immunecells, batch_key= "sample",n_pcs=50,neighbors_within_batch = 1)
+sc.tl.umap(Immunecells)
+sc.tl.leiden(Immunecells,resolution = 1)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color='leiden',legend_loc='on data')
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color='leiden',legend_loc='on data',show=False)
+plt.savefig("figure/umap_leiden_Immunecells.pdf")
+Immunecells.uns['log1p']["base"] = None
+sc.tl.rank_genes_groups(Immunecells, 'leiden', method='wilcoxon')
+Immunecells.write_h5ad("data/Immunecells.h5ad")
+DEG = sc.get.rank_genes_groups_df(Immunecells, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+DEG.to_csv('DEG_Immunecells.csv')
+Immunecells.obs['cluster05'] = Immunecells.obs['leiden']
+cluster05_names = {'0':'CD4 T cells', '1':'CD4 T cells', '2':'B cells',
+                   '3':'Macrophages', '4':'CD4 T cells', '5':'CD8 T cells',
+                   '6':'CD8 T cells', '7':'Macrophages', '8':'CD8 T cells',
+                   '9':'NK cells', '10':'CD8 T cells', '11':'Plasma cells',
+                   '12':'cDCs', '13':'CD8 T cells', '14':'Mast cells',
+                   '15':'pDCs','16':'CD4 T cells','17':'CD4 T cells'}
+Immunecells.obs = Immunecells.obs.replace({'cluster05': cluster05_names})
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color='cluster05',legend_loc='on data')
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color='cluster05',legend_loc='on data',show=False)
+plt.savefig("figure/umap_leiden_annotation_Immunecells.pdf")
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color=['CD3E','CD8A', 'CD8B','CD4','NKG7','KLRD1'],show=False)
+plt.savefig("figure/umap_feature_Immunuecells_1.pdf",bbox_inches = 'tight')
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color=['CD79A','MS4A1', 'JCHAIN','MZB1'],show=False)
+plt.savefig("figure/umap_feature_Immunuecells_2.pdf",bbox_inches = 'tight')
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color=['CD163', 'AIF1','CD68', 'CLEC9A','CD1C', 'LAMP3'],show=False)
+plt.savefig("figure/umap_feature_Immunuecells_3.pdf",bbox_inches = 'tight')
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(Immunecells, color=['LILRA4','IL3RA','TPSB2','TPSAB1'],show=False)
+plt.savefig("figure/umap_feature_Immunuecells_4.pdf",bbox_inches = 'tight')
+marker_genes = ['CD3E', 'CD8A','CD8B', 'CD4','NKG7', 'KLRD1','CD79A','MS4A1','JCHAIN','MZB1',
+                'CD163', 'AIF1','CD68', 'CLEC9A','CD1C', 'LAMP3','LILRA4','IL3RA','TPSB2','TPSAB1']
+sc.pl.dotplot(Immunecells, marker_genes, groupby='cluster05',show = False)
+plt.savefig("figure/dotplot_Immunecells_cluster05.pdf",bbox_inches = 'tight')
+Immunecells.write_h5ad("data/Immunecells.h5ad")
+pd.crosstab(Immunecells.obs['patient'],Immunecells.obs['cluster05']).to_csv('patient_cluster_Immunecells.csv')
+Immunecells.obs['CSCgroup'] = Immunecells.obs['patient']
+CSCgroup_names = {'PS09':'high', 'P80T':'high', 'P9T':'high','P107T':'high', 'P31T':'high', 'P32T':'high',
+                   'P54T':'high', 'P20T':'high', 'P22T':'high','P26T':'high', 'P15T':'high', 'P21T':'high',
+                   'P62T':'high', 'P28T':'high', 'P30T':'high','P10T':'high', 'P44T':'high', 'HN07':'high',
+                   'P52T':'high', 'P83T':'high', 'P23T':'high','P89T':'high', 'P128T':'high', 'P27T':'high',
+                   'P36T':'high', 'P61T':'high', 'P48T':'high','OOC8':'high', 'P19T':'high', 'P74T':'high',
+                   'OOC7':'high', 'P49T':'high', 'P47T':'high','P40T':'high', 'P75T':'high', 'HN04':'low',
+                   'LSCC2':'low', 'P130T':'low', 'P56T':'low','P94T':'low', 'P4T':'low', 'P37T':'low',
+                   'DL2':'low', 'P42T':'low', 'P82T':'low','LUSC1':'low', 'P84T':'low', 'P1':'low',
+                   'P127T':'low', 'P65T':'low', 'P12T':'low','P79T':'low', 'HN14':'low', 'HN06':'low',
+                   'P39T':'low', 'P5T':'low', 'P63T':'low','P91T':'low', 'P38T':'low', 'HN02':'low',
+                   'OOC1':'low', 'OOC3':'low', 'P17T':'low','HN01':'low', 'P24T':'low', 'P104T':'low',
+                   'P10':'low', 'P2':'low', 'P57T':'low','P126T':'low', 'PS07':'low', 'P3':'low',
+                   'PS03':'low', 'PS10':'low', 'P9':'low','P7':'low', 'P76T':'low', 'HNSCC6':'low',
+                   'P1T':'low', 'P4':'low', 'P2T':'low','DL1':'low', 'OOC2':'low', 'HN10':'low',
+                   'P5':'low', 'OOC6':'low', 'LSCC1':'low','OOC4':'low', 'PS06':'low', 'PS01':'low',
+                   'DL7':'low', 'HN03':'low', 'P11T':'low','OOC5':'low', 'HN11':'low', 'P8T':'low',
+                   'HN18':'low', 'PS05':'low', 'HNSCC20':'low','HN09':'low', 'HN15':'low', 'P6':'low',
+                   'P16T':'low', 'HN13':'low', 'P8':'low','HN17':'low', 'HN08':'low', 'HN12':'low',
+                   'HNSCC18':'low', 'CESC':'low', 'HN16':'low','HN05':'low', 'HN23':'low', 'HNSCC':'low',
+                   'HNSCC10':'low', 'HNSCC12':'low', 'HNSCC13':'low','HNSCC16':'low', 'HNSCC17':'low', 'HNSCC22':'low',
+                   'HNSCC24':'low', 'HNSCC25':'low', 'HNSCC26':'low','HNSCC28':'low', 'HNSCC5':'low', 'HNSCC7':'low',
+                   'HNSCC8':'low', 'P87T':'low', 'PS02':'low','PS04':'low', 'PS08':'low', 'PS11':'low'}
+Immunecells.obs = Immunecells.obs.replace({'CSCgroup': CSCgroup_names})
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import chi2_contingency
+
+# 计算交叉表，获取每个cluster在不同CSCgroup中的数量
+crosstab = pd.crosstab(Immunecells.obs['cluster05'], Immunecells.obs['CSCgroup'])
+
+# 计算每个cluster在每个CSCgroup中的百分比
+crosstab_percentage = crosstab.div(crosstab.sum(axis=0), axis=1) * 100
+
+# 指定排序顺序
+order = ['CD4 T cells', 'CD8 T cells', 'NK cells', 'B cells', 
+         'Plasma cells', 'Macrophages','cDCs', 'pDCs', 'Mast cells']
+
+# 按指定顺序排序
+crosstab_percentage = crosstab_percentage.reindex(order)
+
+# 打印百分比表格
+print(crosstab_percentage)
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 假设你已经有以下数据
+data = pd.DataFrame({
+    'CSCgroup': ['low', 'high'],
+    'CD4 T cells': [27.929495, 26.778678],
+    'CD8 T cells': [30.735057, 27.563960],
+    'NK cells': [6.120301, 5.872967],
+    'B cells': [8.161174, 9.870137],
+    'Plasma cells': [4.932226, 7.091126],
+    'Macrophages': [13.415228, 16.656030],
+    'cDCs': [5.859221, 3.281259],
+    'pDCs': [1.032262, 0.822743],
+    'Mast cells': [1.815037, 2.063100]
+}).set_index('CSCgroup')
+
+# 你想要的顺序
+desired_order = ['CD4 T cells', 'CD8 T cells', 'NK cells', 'B cells', 
+                 'Plasma cells', 'Macrophages', 'cDCs', 'pDCs', 'Mast cells']
+
+# 假设 colors 字典包含了每个簇的颜色
+# 例如: colors = {'CD4 T cells': '#1f77b4', 'CD8 T cells': '#ff7f0e', ...}
+# 确保颜色映射和顺序一致
+color_list = [colors[cluster] for cluster in desired_order]
+
+# 按照指定顺序重新排列 data 的列
+data = data[desired_order]
+# 绘制堆积柱状图
+ax = data.plot(kind='bar', stacked=True, color=color_list, figsize=(10, 6))
+
+# 添加百分比标签
+for p in ax.patches:
+    width = p.get_width()
+    height = p.get_height()
+    x, y = p.get_xy() 
+    if height > 0:  # 只标注正值
+        ax.text(x + width / 2, y + height / 2, f'{height:.1f}%', ha='center', va='center')
+
+# 设置图表标题和标签
+plt.title('Percentage of Cell Types in Different CSCgroups')
+plt.ylabel('Percentage')
+plt.xlabel('CSCgroup')
+plt.legend(title='Cell Types', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.grid(False)
+plt.savefig('IL1B/CSC_Immune.pdf')
+plt.show()
+
+Immunecells = sc.read_h5ad("data/Immunecells.h5ad")
+
+Immunecells = Immunecells.raw.to_adata()
+Immunecells
+
+cDCs_Immunecells = Immunecells[Immunecells.obs['cluster05'].isin(['cDCs'])]
+cDCs_Immunecells
+
+import bbknn
+
+sc.pp.normalize_total(cDCs_Immunecells, target_sum=1e4)
+sc.pp.log1p(cDCs_Immunecells)
+sc.pp.highly_variable_genes(cDCs_Immunecells, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+cDCs_Immunecells.raw = cDCs_Immunecells
+cDCs_Immunecells = cDCs_Immunecells[:, cDCs_Immunecells.var.highly_variable]
+sc.pp.regress_out(cDCs_Immunecells, ['total_counts', 'pct_counts_mt'])
+sc.pp.scale(cDCs_Immunecells, max_value=10)
+sc.tl.pca(cDCs_Immunecells, svd_solver='arpack')
+sc.pl.pca_variance_ratio(cDCs_Immunecells, log=True)
+sc.external.pp.bbknn(cDCs_Immunecells, batch_key= "sample",n_pcs=50,neighbors_within_batch = 1)
+sc.tl.umap(cDCs_Immunecells)
+sc.tl.leiden(cDCs_Immunecells,resolution = 0.5)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(cDCs_Immunecells, color='leiden',legend_loc='on data')
+sc.tl.rank_genes_groups(cDCs_Immunecells, 'leiden', method='wilcoxon')
+DEG = sc.get.rank_genes_groups_df(cDCs_Immunecells, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+cDCs_Immunecells = sc.read_h5ad("data/cDCs_Immunecells.h5ad")
+cDCs_Immunecells.obs['cluster06'] = cDCs_Immunecells.obs['leiden']
+cluster06_names = {'0':'Monocytes', '1':'DC_LAMP3', '2':'cDC2',
+                   '3':'cDC2', '4':'cDC1', '5':'T cells'}
+cDCs_Immunecells.obs = cDCs_Immunecells.obs.replace({'cluster06': cluster06_names})
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(cDCs_Immunecells, color='cluster06',legend_loc='on data')
+cDCs_Immunecells_filtered = cDCs_Immunecells[~cDCs_Immunecells.obs['cluster06'].isin(['Monocytes','T cells'])]
+cDCs_Immunecells_filtered
+sc.pp.normalize_total(cDCs_Immunecells_filtered, target_sum=1e4)
+sc.pp.log1p(cDCs_Immunecells_filtered)
+sc.pp.highly_variable_genes(cDCs_Immunecells_filtered, min_mean=0.0125, max_mean=5, min_disp=0, n_top_genes=2000)
+cDCs_Immunecells_filtered.raw = cDCs_Immunecells_filtered
+cDCs_Immunecells_filtered = cDCs_Immunecells_filtered[:, cDCs_Immunecells_filtered.var.highly_variable]
+sc.pp.regress_out(cDCs_Immunecells_filtered, ['total_counts', 'pct_counts_mt'])
+sc.pp.scale(cDCs_Immunecells_filtered, max_value=10)
+sc.tl.pca(cDCs_Immunecells_filtered, svd_solver='arpack')
+sc.pl.pca_variance_ratio(cDCs_Immunecells_filtered, log=True)
+sc.external.pp.bbknn(cDCs_Immunecells_filtered, batch_key= "sample",n_pcs=50,neighbors_within_batch = 1)
+sc.tl.umap(cDCs_Immunecells_filtered)
+sc.tl.leiden(cDCs_Immunecells_filtered,resolution = 0.5)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(cDCs_Immunecells_filtered, color='leiden',legend_loc='on data')
+sc.tl.rank_genes_groups(cDCs_Immunecells_filtered, 'leiden', method='wilcoxon')
+DEG = sc.get.rank_genes_groups_df(cDCs_Immunecells_filtered, group = None, pval_cutoff = 0.05, log2fc_min = 0)
+DEG.to_csv('DEG_cDCs_Immunecells_filtered.csv')
+cDCs_Immunecells_filtered.obs['cluster07'] = cDCs_Immunecells_filtered.obs['leiden']
+cluster07_names = {'0':'cDC2', '1':'cDC3', '2':'cDC2',
+                   '3':'cDC1', '4':'cDC3'}
+cDCs_Immunecells_filtered.obs = cDCs_Immunecells_filtered.obs.replace({'cluster07': cluster07_names})
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10,10))
+sc.pl.umap(cDCs_Immunecells_filtered, color='cluster07',legend_loc='on data')
+marker_genes = ['CLEC9A','BATF3', 'CD1C','FCER1A','LAMP3','FSCN1']
+sc.pl.dotplot(cDCs_Immunecells_filtered, marker_genes, groupby='cluster07',show = False)
+cross = pd.crosstab(cDCs_Immunecells_filtered.obs['CSCgroup'],cDCs_Immunecells_filtered.obs['cluster07'])
+cross = cross.reset_index()
+x = cross['CSCgroup']
+summ = cross['cDC1']+cross['cDC2']+cross['cDC3']
+y1 = cross['cDC1']/summ
+y2 = cross['cDC2']/summ
+y3 = cross['cDC3']/summ
+plt.bar(x,y1,width=0.4,label='cDC1',edgecolor='grey',zorder=5)
+plt.bar(x,y2,width=0.4,bottom = y1, label='cDC2',edgecolor='grey',zorder=5)
+plt.bar(x,y3,width=0.4,bottom = y1+y2,label='cDC3',edgecolor='grey',zorder=5)
+plt.tick_params(axis='x',length=0)
+plt.xlabel('Group',fontsize=20)
+plt.ylabel('Proportion',fontsize=20)
+plt.ylim(0,1.01)
+plt.yticks(np.arange(0,1.2,0.2),[f'{i}%' for i in range(0,120,20)])
+plt.grid(axis='y',alpha=0.5,ls='--')
+# 添加图例，将图例移至图外
+plt.legend(frameon=False,bbox_to_anchor=(1.01,1))
+plt.show()
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['LAMP3','CCR7','CD274'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_CD274.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['CD40','CD80','CD86','RELB','CD83'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_maturation.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['ADAM8','MARCKS','ICAM1','MARCKSL1',
+                                          'CCR7','FSCN1','CXCL16','MYO1G'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_migration.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['CD274','PDCD1LG2','CD200','FAS',
+                                          'SOCS1','SOCS2'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_regulatory.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['MYD88','TICAM1','MAVS',
+                                          'TLR8','TLR7','TLR6','TLR5',
+                                          'TLR4','TLR3','TLR2','TLR1'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_TLR.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.pl.dotplot(cDCs_Immunecells_filtered, ['CCL17','CCL22','CCL19',
+                                          'CXCL9','IL32','IL15','EBI3'], groupby='cluster07',show = False)
+plt.savefig("figure/dotplot_cluster07_proinflammatory.pdf", format="pdf", bbox_inches="tight", dpi=300)
+
+import cellrank as cr
+cDCs_Immunecells_filtered = sc.read("data/cDCs_Immunecells_filtered.h5ad")
+# This is a necessary hack. See CellRank docs
+cDCs_Immunecells_filtered.layers["spliced"] = cDCs_Immunecells_filtered.X
+cDCs_Immunecells_filtered.layers["unspliced"] = cDCs_Immunecells_filtered.X
+scv.pp.moments(cDCs_Immunecells_filtered, n_pcs=30, n_neighbors=30)
+from cellrank.kernels import CytoTRACEKernel
+ctk = CytoTRACEKernel(cDCs_Immunecells_filtered).compute_cytotrace()
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+sc.pl.umap(cDCs_Immunecells_filtered, color=["ct_score"],legend_loc='on data',color_map="gnuplot2",show = False)
+plt.savefig("figure_0209/cDCs_cytotrace.pdf", format="pdf", bbox_inches="tight", dpi=300)
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+sc.pl.violin(cDCs_Immunecells_filtered, keys=["ct_score","ct_pseudotime"], groupby="cluster07", rotation=90,show = False)
+plt.savefig("figure_0209/cDCs_cytotrace_violin.pdf", format="pdf", bbox_inches="tight", dpi=300)
+ctk.compute_transition_matrix(threshold_scheme="soft", nu=0.5)
+ctk.plot_projection(basis="umap")
+sc.settings.set_figure_params(dpi=50, dpi_save=300, figsize=(10, 10))
+scv.pl.velocity_embedding_stream(
+    cDCs_Immunecells_filtered, color="cluster07", vkey="T_fwd", basis="umap", legend_loc="on data",show = False)
+plt.savefig("figure_0209/cDCs_cellrank.pdf", format="pdf", bbox_inches="tight", dpi=300)
+
+%load_ext autoreload
+%autoreload 2
+
+import numpy as np
+
+from matplotlib import pyplot as plt
+
+from pyslingshot import Slingshot
+cDCs_Immunecells_filtered = sc.read("data/cDCs_Immunecells_filtered.h5ad")
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
+custom_xlim = (-12, 12)
+custom_ylim = (-12, 12)
+# plt.setp(axes, xlim=custom_xlim, ylim=custom_ylim)
+
+slingshot = Slingshot(cDCs_Immunecells_filtered, celltype_key="leiden", obsm_key="X_umap", debug_level='verbose')
+
+slingshot.fit(num_epochs=1, debug_axes=axes)
+fig, axes = plt.subplots(ncols=2, figsize=(12, 4))
+axes[0].set_title('Clusters')
+axes[1].set_title('Pseudotime')
+slingshot.plotter.curves(axes[0], slingshot.curves)
+slingshot.plotter.clusters(axes[0], labels=np.arange(slingshot.num_clusters), s=4, alpha=0.5)
+slingshot.plotter.clusters(axes[1], color_mode='pseudotime', s=5)
+plt.savefig("figure_0209/cDCs_Slingshot.pdf", format="pdf", bbox_inches="tight", dpi=300)
+
+import sctour as sct
+import scanpy as sc
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+cDCs_Immunecells_filtered = sc.read("data/cDCs_Immunecells_filtered.h5ad")
+
+sc.pp.calculate_qc_metrics(cDCs_Immunecells_filtered, percent_top=None, log1p=False, inplace=True)
+sc.pp.highly_variable_genes(cDCs_Immunecells_filtered, subset=True)
+cDCs_Immunecells_filtered.X = cDCs_Immunecells_filtered.X.astype('float32') # convert data to float32 type
+tnode = sct.train.Trainer(cDCs_Immunecells_filtered, loss_mode='mse')
+tnode.train()
+cDCs_Immunecells_filtered.obs['ptime'] = tnode.get_time()
+#zs represents the latent z from variational inference, and pred_zs represents the latent z from ODE solver
+#mix_zs represents the weighted combination of the two, which is used for downstream analysis
+mix_zs, zs, pred_zs = tnode.get_latentsp(alpha_z=0.5, alpha_predz=0.5)
+cDCs_Immunecells_filtered.obsm['X_TNODE'] = mix_zs
+
+cDCs_Immunecells_filtered.obsm['X_VF'] = tnode.get_vector_field(cDCs_Immunecells_filtered.obs['ptime'].values, cDCs_Immunecells_filtered.obsm['X_TNODE'])
+cDCs_Immunecells_filtered = cDCs_Immunecells_filtered[np.argsort(cDCs_Immunecells_filtered.obs['ptime'].values), :]
+fig, axs = plt.subplots(ncols=2, nrows=2, figsize=(10, 10))
+sc.pl.umap(cDCs_Immunecells_filtered, color='leiden', ax=axs[0, 0], legend_loc='on data', show=False, frameon=False)
+sc.pl.umap(cDCs_Immunecells_filtered, color='cluster07', ax=axs[0, 1], legend_loc='on data', show=False, frameon=False)
+sc.pl.umap(cDCs_Immunecells_filtered, color='ptime', ax=axs[1, 0], show=False, frameon=False)
+sct.vf.plot_vector_field(cDCs_Immunecells_filtered, zs_key='X_TNODE', vf_key='X_VF', use_rep_neigh='X_TNODE', color='cluster07', show=False, ax=axs[1, 1], legend_loc='none', frameon=False, size=100, alpha=0.2)
+plt.show()
